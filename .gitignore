@@ -1,0 +1,112 @@
+# OS Generated Files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# Logs & Runtime Artifacts
+logs/
+*.log
+hs_err_pid*
+*.pid
+*.pid.lock
+
+# Environment & Secrets (IMPORTANT)
+.env
+.env.*
+.env.local
+.env.*.local
+*.env
+
+credentials.properties
+application-local.properties
+application-*.local.properties
+
+# Keystores / certs / private keys
+*.jks
+*.keystore
+*.pem
+*.p12
+
+# IDEs & Editors
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+
+# VS Code
+.vscode/
+!.vscode/extensions.json
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# NetBeans
+nbproject/private/
+nbbuild/
+nbdist/
+.nb-gradle/
+
+# Frontend (Node / React / Vite)
+node_modules/
+dist/
+build/
+.vite/
+
+# Frontend logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Backend (Java / Maven / Spring Boot)
+
+# Maven build output
+target/
+
+# Compiled binaries
+*.class
+*.jar
+*.war
+*.ear
+
+# Maven temporary / release files
+dependency-reduced-pom.xml
+release.properties
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+
+# Test & coverage reports
+surefire-reports/
+failsafe-reports/
+jacoco.exec
+coverage/
+target/site/
+
+# Spring Boot devtools
+.restart/
+
+# Build & Tooling Caches
+.gradle/
+build/
+out/
+
+# Database / Local data
+data/db/
+dump/
+
+# Temporary & Backup Files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.local
+*.hprof
+*.stackdump
