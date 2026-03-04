@@ -15,10 +15,21 @@ public class Message {
     private String sender;
     private String content;
     private LocalDateTime timeStamp;
+    private MessageType messageType = MessageType.TEXT;
+    private String imageUrl;
 
     public Message(String sender, String content) {
         this.sender = sender;
         this.content = content;
         this.timeStamp = LocalDateTime.now();
+        this.messageType = MessageType.TEXT;
+    }
+
+    public Message(String sender, String content, MessageType messageType, String imageUrl) {
+        this.sender = sender;
+        this.content = content;
+        this.timeStamp = LocalDateTime.now();
+        this.messageType = messageType;
+        this.imageUrl = imageUrl;
     }
 }

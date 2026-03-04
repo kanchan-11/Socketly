@@ -1,6 +1,7 @@
 package com.codinglearn.chat.backend.services;
 
 import com.codinglearn.chat.backend.entitites.Message;
+import com.codinglearn.chat.backend.entitites.MessageType;
 import com.codinglearn.chat.backend.payload.MessageRequest;
 import com.codinglearn.chat.backend.repositories.ChatRoomRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +25,9 @@ public class ChatServiceImpl implements ChatService {
         message.setContent(request.getContent());
         message.setSender(request.getSender());
         message.setTimeStamp(LocalDateTime.now());
+        message.setMessageType(request.getMessageType() != null ? request.getMessageType() : MessageType.TEXT);
+        message.setImageUrl(request.getImageUrl());
+
         if(chatRoom!=null){
             chatRoom.getMessages().add(message);
             chatRoomRepository.save(chatRoom);
