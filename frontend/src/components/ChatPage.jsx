@@ -1,79 +1,92 @@
-import React, { use, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { MdAttachFile, MdSend } from "react-icons/md";
 import useChatContext from "../context/ChatContext";
 import { useNavigate } from "react-router";
 import toast from "react-hot-toast";
 import { baseURL } from "../config/AxiosHelper";
 import SockJS from "sockjs-client";
-import {Stomp} from "@stomp/stompjs";
-import { getChatHistoryService } from "../services/RoomService";
-import { timeAgo } from "../config/helper";
+import { Stomp } from "@stomp/stompjs";
+import { getChatHistoryService, uploadImageService } from "../services/RoomService";
+import { isSameDay } from "../config/helper";
+import { MessageBubble, DateSeparator, ImagePreviewModal, ImageSendModal } from "./chat";
 
 const ChatPage = () => {
-    const { roomId, currentUser, connected, setConnected,setRoomId,setCurrentUser } = useChatContext();
-    console.log(roomId, currentUser, connected);
+    const { roomId, currentUser, connected, setConnected, setRoomId, setCurrentUser } = useChatContext();
     const navigate = useNavigate();
-    useEffect(() => {
-        if (!connected)
-            navigate("/")
-    }, [connected, roomId, currentUser]);
+    
     const [messages, setMessages] = useState([]);
-
     const [input, setInput] = useState("");
-    const inputRef = useRef(null);
-    const chatBoxRef = useRef(null);
     const [stompClient, setStompClient] = useState(null);
+    const [uploading, setUploading] = useState(false);
+    const [previewImage, setPreviewImage] = useState(null);
+    const [pendingImage, setPendingImage] = useState(null);
+    
+    const chatBoxRef = useRef(null);
+    const fileInputRef = useRef(null);
+    const stompClientRef = useRef(null);
 
+    // Redirect if not connected
     useEffect(() => {
-        async function loadChatHistory() {
+        if (!connected) navigate("/");
+    }, [connected, navigate]);
+
+    // Load chat history
+    useEffect(() => {
+        if (!connected) return;
+        
+        const loadChatHistory = async () => {
             try {
                 const response = await getChatHistoryService(roomId);
-                console.log("Chat history response: ", response);
                 setMessages(response);
-                        
             } catch (error) {
-                console.error("Error loading chat history: ", error);
                 toast.error("Failed to load chat history");
             }
-        }
-        if(connected)
-            loadChatHistory();
-    }, [roomId]);
+        };
+        loadChatHistory();
+    }, [roomId, connected]);
 
+    // Auto-scroll to bottom
     useEffect(() => {
         if (chatBoxRef.current) {
             chatBoxRef.current.scroll({
-                    top: chatBoxRef.current.scrollHeight,
-                    behavior: "smooth"
+                top: chatBoxRef.current.scrollHeight,
+                behavior: "smooth"
             });
         }
     }, [messages]);
-    useEffect(() => {
-        const connectWebSocket = () => {
-            const socket = new SockJS(`${baseURL}/chat`);
-            const client = Stomp.over(socket);
-            client.connect({}, () => {
-                console.log("Connected to WebSocket");
-                setStompClient(client);
-                toast.success("Connected to chat server");
-                client.subscribe(`/topic/room/${roomId}`, (message) => {
-                    console.log("Received message: ", message);
-                    const newMessage = JSON.parse(message.body);
-                    setMessages((prevMessages) => [...prevMessages, newMessage]);
-                });
-            }, (error) => {
-                console.error("WebSocket connection error: ", error);
-                toast.error("Failed to connect to chat server");
-            });
-        }
-        if(connected)
-            connectWebSocket();
-    }, [roomId]);
 
-    const sendMessage = async () => {
-        if(stompClient && connected && input.trim() !== "") {
+    // WebSocket connection with cleanup
+    useEffect(() => {
+        if (!connected) return;
+
+        const socket = new SockJS(`${baseURL}/chat`);
+        const client = Stomp.over(socket);
+        client.debug = () => {}; // Disable debug logs
+        
+        client.connect({}, () => {
+            setStompClient(client);
+            stompClientRef.current = client;
+            toast.success("Connected to chat server");
+            
+            client.subscribe(`/topic/room/${roomId}`, (message) => {
+                const newMessage = JSON.parse(message.body);
+                setMessages((prev) => [...prev, newMessage]);
+            });
+        }, () => {
+            toast.error("Failed to connect to chat server");
+        });
+
+        return () => {
+            if (stompClientRef.current?.connected) {
+                stompClientRef.current.disconnect();
+            }
+        };
+    }, [roomId, connected]);
+
+    const sendMessage = useCallback(() => {
+        if (stompClient && connected && input.trim()) {
             const message = {
-                content: input, 
+                content: input,
                 sender: currentUser,
                 roomId: roomId
             };
@@ -81,21 +94,89 @@ const ChatPage = () => {
                 stompClient.send(`/app/sendMessage/${roomId}`, {}, JSON.stringify(message));
                 setInput("");
             } catch (error) {
-                console.error("Error sending message: ", error);
                 toast.error("Failed to send message");
             }
         }
-    }
+    }, [stompClient, connected, input, currentUser, roomId]);
 
-    function handleLogOut() {
-        stompClient.disconnect();
+    const handleFileSelect = useCallback(() => {
+        fileInputRef.current?.click();
+    }, []);
+
+    const handleImageUpload = useCallback((e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            toast.error("Please select an image file");
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error("Image size should be less than 5MB");
+            return;
+        }
+
+        const previewUrl = URL.createObjectURL(file);
+        setPendingImage({ file, previewUrl });
+        e.target.value = '';
+    }, []);
+
+    const cancelPendingImage = useCallback(() => {
+        if (pendingImage?.previewUrl) {
+            URL.revokeObjectURL(pendingImage.previewUrl);
+        }
+        setPendingImage(null);
+    }, [pendingImage]);
+
+    const confirmSendImage = useCallback(async () => {
+        if (!pendingImage?.file) return;
+
+        setUploading(true);
+        try {
+            const imageUrl = await uploadImageService(roomId, pendingImage.file);
+            if (stompClient && connected) {
+                const message = {
+                    content: imageUrl,
+                    sender: currentUser,
+                    roomId: roomId,
+                    messageType: "IMAGE"
+                };
+                stompClient.send(`/app/sendMessage/${roomId}`, {}, JSON.stringify(message));
+                toast.success("Image sent");
+            }
+        } catch (error) {
+            toast.error("Failed to upload image");
+        } finally {
+            setUploading(false);
+            if (pendingImage?.previewUrl) {
+                URL.revokeObjectURL(pendingImage.previewUrl);
+            }
+            setPendingImage(null);
+        }
+    }, [pendingImage, roomId, stompClient, connected, currentUser]);
+
+    const handleImageClick = useCallback((imageUrl) => {
+        setPreviewImage(imageUrl);
+    }, []);
+
+    const closePreview = useCallback(() => {
+        setPreviewImage(null);
+    }, []);
+
+    const handleKeyDown = useCallback((e) => {
+        if (e.key === "Enter") sendMessage();
+    }, [sendMessage]);
+
+    const handleLogOut = useCallback(() => {
+        stompClientRef.current?.disconnect();
         setConnected(false);
         setMessages([]);
         setRoomId("");
         setCurrentUser("");
         setInput("");
         navigate("/");
-    }
+    }, [setConnected, setRoomId, setCurrentUser, navigate]);
     return (
         <div className="">
             <header className="dark:border-gray-700 fixed w-full dark:bg-gray-900 shadow px-3 py-5 flex justify-around">
@@ -115,42 +196,74 @@ const ChatPage = () => {
                 </div>
             </header>
             <main ref={chatBoxRef} className="py-20 px-10 dark:bg-slate-600 w-2/3 overflow-auto mx-auto h-screen">
-                {messages.map((message, index) => (
-                    <div key={index} className={`flex ${message.sender === currentUser ? "justify-end" : "justify-start"}`}>
-                        <div className={`my-2 ${message.sender === currentUser ? "bg-green-500" : "bg-blue-500"} p-2 rounded max-w-xs`}>
-                            <div className="flex flex-row gap-2">
-                                <img src={'https://avataaars.io/?avatarStyle=Circle&topType=LongHairStraight&accessoriesType=Blank&hairColor=BrownDark&facialHairType=Blank&clotheType=BlazerShirt&eyeType=Default&eyebrowType=Default&mouthType=Default&skinColor=Light'}
-                                    alt="" className="w-10 h-10" />
-                                <div className="flex flex-col gap-1">
-                                    <p className="text-sm font-bold">{message.sender}</p>
-                                    <p>{message.content}</p>
-                                    <p className="text-xs text-gray-600 self-end">{timeAgo(message.timeStamp)}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                ))
-                }
+                {messages.map((message, index) => {
+                    const showDateSeparator = index === 0 || 
+                        !isSameDay(message.timeStamp, messages[index - 1].timeStamp);
+                    
+                    return (
+                        <React.Fragment key={index}>
+                            {showDateSeparator && (
+                                <DateSeparator timestamp={message.timeStamp} />
+                            )}
+                            <MessageBubble
+                                message={message}
+                                isOwnMessage={message.sender === currentUser}
+                                onImageClick={handleImageClick}
+                            />
+                        </React.Fragment>
+                    );
+                })}
             </main>
             <div className="fixed bottom-4 w-full h-16">
                 <div className="h-full pr-10 gap-4 rounded-full w-1/2 items-center justify-between flex mx-auto dark:bg-gray-900">
-                    <input type="text" onKeyDown={(e)=>{
-                        if(e.key === "Enter") {
-                            sendMessage();
-                        }
-                    }} value={input} onChange={(e) => setInput(e.target.value)} placeholder="Type your message here..." className="dark:border-gray-600 focus:outline-none px-5 dark:bg-gray-800 rounded-full focus:ring-0 w-full py-2 rounded h-full" />
+                    <input
+                        type="text"
+                        onKeyDown={handleKeyDown}
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        placeholder="Type your message here..."
+                        className="dark:border-gray-600 focus:outline-none px-5 dark:bg-gray-800 rounded-full focus:ring-0 w-full py-2 h-full"
+                    />
                     <div className="flex gap-1">
-                        <button className="dark:bg-purple-600 h-10 w-10 flex justify-center items-center rounded-full">
-                            <MdAttachFile size={20} />
+                        <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            onChange={handleImageUpload} 
+                            accept="image/*" 
+                            className="hidden" 
+                        />
+                        <button 
+                            onClick={handleFileSelect} 
+                            disabled={uploading}
+                            className={`dark:bg-purple-600 h-10 w-10 flex justify-center items-center rounded-full ${uploading ? 'opacity-50 cursor-not-allowed' : 'hover:dark:bg-purple-700'}`}
+                        >
+                            {uploading ? (
+                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            ) : (
+                                <MdAttachFile size={20} />
+                            )}
                         </button>
-                        <button onClick={sendMessage} className="dark:bg-green-600 h-10 w-10 flex justify-center items-center rounded-full">
+                        <button onClick={sendMessage} className="dark:bg-green-600 h-10 w-10 flex justify-center items-center rounded-full hover:dark:bg-green-700">
                             <MdSend size={20} />
                         </button>
                     </div>
 
                 </div>
             </div>
+
+            <ImagePreviewModal 
+                imageUrl={previewImage} 
+                onClose={closePreview} 
+            />
+
+            <ImageSendModal
+                previewUrl={pendingImage?.previewUrl}
+                uploading={uploading}
+                onConfirm={confirmSendImage}
+                onCancel={cancelPendingImage}
+            />
         </div>
-    )
-}
+    );
+};
+
 export default ChatPage;
