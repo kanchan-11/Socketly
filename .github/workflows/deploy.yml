@@ -44,6 +44,6 @@ jobs:
         username: root
         key: ${{ secrets.SERVER_SSH_KEY }}
         script: |
-          cd /apps/socketly
+          cd /opt/socketly
           docker compose pull
           docker compose up -d
