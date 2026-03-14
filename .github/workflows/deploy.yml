@@ -45,7 +45,7 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         source: "."
         target: "/opt/socketly"
-        
+
     - name: Deploy to Server
       uses: appleboy/ssh-action@v1
       with:
@@ -53,6 +53,6 @@ jobs:
         username: root
         key: ${{ secrets.SERVER_SSH_KEY }}
         script: |
-          cd /opt/socketly
+          cd /opt/socketly/infra
           docker compose pull
-          docker compose up -d
+          docker compose up -d --build
