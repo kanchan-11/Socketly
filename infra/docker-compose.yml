@@ -5,6 +5,8 @@ services:
   backend:
     image: kanchanagarwal11/socketly-backend:latest
     container_name: socketly-backend
+    ports:
+    - "8080:8080"
     build:
       context: ../backend
       dockerfile: Dockerfile
@@ -21,6 +23,8 @@ services:
     build:
       context: ../frontend
       dockerfile: Dockerfile
+    ports:
+    - "5173:80"
     restart: always
     networks:
       - socketly-network
