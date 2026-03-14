@@ -3,7 +3,7 @@ version: "3.8"
 services:
 
   backend:
-    image: kanchan11/socketly-backend:latest
+    image: kanchanagarwal11/socketly-backend:latest
     container_name: socketly-backend
     build:
       context: ../backend
@@ -16,7 +16,7 @@ services:
       - socketly-network
 
   frontend:
-    image: kanchan11/socketly-frontend:latest
+    image: kanchanagarwal11/socketly-frontend:latest
     container_name: socketly-frontend
     build:
       context: ../frontend

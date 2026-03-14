@@ -29,13 +29,13 @@ jobs:
 
     - name: Build and Push Backend Image
       run: |
-        docker build -t kanchan11/socketly-backend ./backend
-        docker push kanchan11/socketly-backend
+        docker build -t kanchanagarwal11/socketly-backend ./backend
+        docker push kanchanagarwal11/socketly-backend
 
     - name: Build and Push Frontend Image
       run: |
-        docker build -t kanchan11/socketly-frontend ./frontend
-        docker push kanchan11/socketly-frontend
+        docker build -t kanchanagarwal11/socketly-frontend ./frontend
+        docker push kanchanagarwal11/socketly-frontend
 
     - name: Deploy to Server
       uses: appleboy/ssh-action@v1
