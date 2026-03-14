@@ -37,6 +37,15 @@ jobs:
         docker build -t kanchanagarwal11/socketly-frontend ./frontend
         docker push kanchanagarwal11/socketly-frontend
 
+    - name: Copy repo to Server
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.SERVER_IP }}
+        username: root
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        source: "."
+        target: "/opt/socketly"
+        
     - name: Deploy to Server
       uses: appleboy/ssh-action@v1
       with:
